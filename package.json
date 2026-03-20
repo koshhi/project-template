@@ -1,0 +1,10 @@
+{
+  "name": "project-template",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "ai:sync": "node scripts/sync-ai-skills.js",
+    "ai:list": "node scripts/list-ai-skills.js"
+  }
+}
