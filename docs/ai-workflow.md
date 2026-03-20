@@ -22,12 +22,14 @@ Esto asegura que existan:
 ## 3. Sincronizar shared skills
 
 ```bash
-SHARED_AI_SKILLS_PATH=/ruta/a/shared-ai-skills pnpm ai:sync
+pnpm ai:sync
 ```
 
 El sync:
 
-- lee la fuente compartida
+- usa `SHARED_AI_SKILLS_PATH` si está definida
+- usa `../shared-ai-skills` si existe como carpeta hermana
+- descarga automáticamente `shared-ai-skills` en `.ai/_sources/shared-ai-skills` si no encuentra una fuente local
 - copia `skills/`, `templates/` y `prompts/` si existen
 - actualiza `.ai/manifest.json`
 - no modifica `.ai/local/`

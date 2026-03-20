@@ -6,7 +6,11 @@ const rootDir = path.resolve(__dirname, "..");
 const aiDir = path.join(rootDir, ".ai");
 const localDir = path.join(aiDir, "local");
 const sharedDir = path.join(aiDir, "shared");
+const sourcesDir = path.join(aiDir, "_sources");
+const cachedSharedRepoDir = path.join(sourcesDir, "shared-ai-skills");
 const manifestPath = path.join(aiDir, "manifest.json");
+const siblingSharedRepoDir = path.resolve(rootDir, "..", "shared-ai-skills");
+const defaultSharedRepoUrl = "https://github.com/koshhi/shared-ai-skills.git";
 
 const syncableEntries = ["skills", "templates", "prompts", "metadata.json"];
 
@@ -18,6 +22,14 @@ const defaultManifest = {
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function runGit(args, options = {}) {
+  return execFileSync("git", args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    ...options
+  }).trim();
 }
 
 function copyRecursive(sourcePath, targetPath) {
@@ -89,36 +101,82 @@ function readVersion(sourcePath) {
   }
 
   try {
-    return execFileSync(
-      "git",
-      ["-C", sourcePath, "rev-parse", "--short", "HEAD"],
-      {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"]
-      }
-    ).trim();
+    return runGit(["-C", sourcePath, "rev-parse", "--short", "HEAD"], {
+      stdio: ["ignore", "pipe", "ignore"]
+    });
   } catch {
     return new Date().toISOString();
   }
 }
 
-function main() {
-  const rawSourcePath = process.env.SHARED_AI_SKILLS_PATH;
+function ensureCachedSharedRepo() {
+  const repoUrl = process.env.SHARED_AI_SKILLS_REPO_URL || defaultSharedRepoUrl;
 
-  if (!rawSourcePath) {
+  ensureDir(sourcesDir);
+
+  if (fs.existsSync(cachedSharedRepoDir)) {
+    try {
+      runGit(["-C", cachedSharedRepoDir, "pull", "--ff-only"], {
+        stdio: ["ignore", "pipe", "ignore"]
+      });
+      return {
+        sourcePath: cachedSharedRepoDir,
+        sourceLabel: `${cachedSharedRepoDir} (updated from ${repoUrl})`
+      };
+    } catch (error) {
+      throw new Error(
+        `Could not update cached shared-ai-skills repo at ${cachedSharedRepoDir}. ${error.message}`
+      );
+    }
+  }
+
+  try {
+    runGit(["clone", "--depth", "1", repoUrl, cachedSharedRepoDir], {
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+  } catch (error) {
     throw new Error(
-      "Missing SHARED_AI_SKILLS_PATH. Point it to the shared-ai-skills repo."
+      `Could not bootstrap shared-ai-skills from ${repoUrl}. ${error.message}`
     );
   }
 
-  const sourcePath = path.resolve(rawSourcePath);
+  return {
+    sourcePath: cachedSharedRepoDir,
+    sourceLabel: `${cachedSharedRepoDir} (bootstrapped from ${repoUrl})`
+  };
+}
 
-  if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isDirectory()) {
-    throw new Error(`Invalid SHARED_AI_SKILLS_PATH: ${sourcePath}`);
+function resolveSource() {
+  const rawSourcePath = process.env.SHARED_AI_SKILLS_PATH;
+
+  if (rawSourcePath) {
+    const sourcePath = path.resolve(rawSourcePath);
+
+    if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isDirectory()) {
+      throw new Error(`Invalid SHARED_AI_SKILLS_PATH: ${sourcePath}`);
+    }
+
+    return {
+      sourcePath,
+      sourceLabel: `${sourcePath} (from SHARED_AI_SKILLS_PATH)`
+    };
   }
 
+  if (fs.existsSync(siblingSharedRepoDir) && fs.statSync(siblingSharedRepoDir).isDirectory()) {
+    return {
+      sourcePath: siblingSharedRepoDir,
+      sourceLabel: `${siblingSharedRepoDir} (from sibling folder)`
+    };
+  }
+
+  return ensureCachedSharedRepo();
+}
+
+function main() {
+  const { sourcePath, sourceLabel } = resolveSource();
+
   if (sourcePath === sharedDir) {
-    throw new Error("SHARED_AI_SKILLS_PATH cannot point to .ai/shared.");
+    throw new Error("The shared source cannot point to .ai/shared.");
   }
 
   ensureDir(aiDir);
@@ -148,7 +206,7 @@ function main() {
   ensureDir(path.dirname(manifestPath));
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
-  console.log(`✓ synced from ${sourcePath}`);
+  console.log(`✓ synced from ${sourceLabel}`);
 
   if (copiedEntries.length === 0) {
     console.log("✓ no shareable content found");
