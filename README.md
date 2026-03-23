@@ -52,7 +52,7 @@ Resolución de la fuente shared:
 Estado esperado después del arranque:
 
 - `.ai/local/` existe y está lista para editarse
-- `.ai/shared/` contiene las skills sincronizadas
+- `.ai/shared/` se puebla al ejecutar `pnpm ai:sync`
 - `.ai/_sources/shared-ai-skills` puede existir como caché local del repo compartido
 - `.ai/manifest.json` refleja la última sincronización
 - `.planning/config.json` existe si se ejecutó `pnpm ai:gsd:init`

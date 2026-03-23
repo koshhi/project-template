@@ -19,6 +19,8 @@ Esto asegura que existan:
 - `.ai/manifest.json`
 - `.mcp/`
 
+`pnpm setup` crea la estructura; las shared skills no se versionan dentro del template y solo aparecen tras `pnpm ai:sync`.
+
 ## 3. Sincronizar shared skills
 
 ```bash
