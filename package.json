@@ -5,6 +5,7 @@
   "scripts": {
     "setup": "node scripts/setup.js",
     "ai:sync": "node scripts/sync-ai-skills.js",
-    "ai:list": "node scripts/list-ai-skills.js"
+    "ai:list": "node scripts/list-ai-skills.js",
+    "ai:gsd:init": "node scripts/init-gsd.js"
   }
 }

@@ -40,6 +40,35 @@ El sync:
 pnpm ai:list
 ```
 
-## 5. Añadir contexto local
+Ademas de shared y local, este comando muestra:
+
+- estado GSD para Claude
+- estado GSD para Codex
+- estado de `.planning/`
+
+## 5. Activar GSD para Claude y Codex (opcional)
+
+```bash
+pnpm ai:gsd:init
+```
+
+Este bootstrap:
+
+- instala GSD localmente para Claude y Codex por defecto
+- acepta `--runtime=claude|codex|both`
+- crea `.planning/config.json` si falta
+- no toca `.ai/local/`
+
+Comandos base por runtime:
+
+- Claude: `/gsd:help`
+- Codex: `$gsd-help`
+
+## 6. Añadir contexto local
 
 Cualquier conocimiento específico del repo debe vivir en `.ai/local/`.
+
+Mantén separadas las dos capas:
+
+- `.ai/*` para conocimiento reusable y contexto del proyecto
+- `.planning/*` para el estado operativo de GSD
