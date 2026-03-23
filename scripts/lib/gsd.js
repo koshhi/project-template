@@ -1,6 +1,32 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const templateBootstrapConfig = {
+  ignore_dirs: [
+    ".ai",
+    ".claude",
+    ".codex",
+    ".github",
+    ".mcp",
+    ".planning",
+    "docs",
+    "scripts",
+    "tests",
+    "node_modules",
+    "dist",
+    "build",
+    "target"
+  ],
+  ignore_files: [
+    ".DS_Store",
+    ".gitignore",
+    "AGENTS.md",
+    "README.md",
+    "package.json",
+    "pnpm-lock.yaml"
+  ]
+};
+
 const runtimeDefinitions = {
   claude: {
     label: "Claude",
@@ -41,6 +67,27 @@ function readJson(jsonPath) {
 function writeJson(jsonPath, value) {
   fs.mkdirSync(path.dirname(jsonPath), { recursive: true });
   fs.writeFileSync(jsonPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function getTemplateBootstrapConfigPath(rootDir) {
+  return path.join(rootDir, ".ai", "template-bootstrap.json");
+}
+
+function ensureTemplateBootstrapConfig(rootDir) {
+  const configPath = getTemplateBootstrapConfigPath(rootDir);
+
+  if (!pathExists(configPath)) {
+    writeJson(configPath, templateBootstrapConfig);
+    return {
+      created: true,
+      path: configPath
+    };
+  }
+
+  return {
+    created: false,
+    path: configPath
+  };
 }
 
 function parseRuntimeSelection(argv) {
@@ -234,14 +281,99 @@ function ensurePlanningConfig(rootDir, preferredRuntimes = runtimeNames) {
   };
 }
 
+function patchGsdInitForTemplateBootstrap(rootDir, runtimeName) {
+  const initPath = path.join(
+    rootDir,
+    runtimeDefinitions[runtimeName].rootDirName,
+    "get-shit-done",
+    "bin",
+    "lib",
+    "init.cjs"
+  );
+
+  if (!pathExists(initPath)) {
+    return {
+      patched: false,
+      reason: "missing init.cjs",
+      path: initPath
+    };
+  }
+
+  const source = fs.readFileSync(initPath, "utf8");
+
+  if (source.includes("template-bootstrap.json")) {
+    return {
+      patched: false,
+      reason: "already patched",
+      path: initPath
+    };
+  }
+
+  const detectionBlock = `hasPackageFile = pathExistsInternal(cwd, 'package.json') ||
+                   pathExistsInternal(cwd, 'requirements.txt') ||
+                   pathExistsInternal(cwd, 'Cargo.toml') ||
+                   pathExistsInternal(cwd, 'go.mod') ||
+                   pathExistsInternal(cwd, 'Package.swift');`;
+
+  const injectedBlock = `${detectionBlock}
+
+  let isTemplateBootstrapOnlyProject = false;
+  try {
+    const templateBootstrapPath = path.join(cwd, '.ai', 'template-bootstrap.json');
+    if (fs.existsSync(templateBootstrapPath)) {
+      const templateBootstrap = JSON.parse(fs.readFileSync(templateBootstrapPath, 'utf8'));
+      const defaultSkippedDirs = new Set(['node_modules', '.git', '.planning', '.claude', '.codex', '__pycache__', 'target', 'dist', 'build']);
+      const ignoredDirs = new Set(templateBootstrap.ignore_dirs || []);
+      const ignoredFiles = new Set(templateBootstrap.ignore_files || []);
+      function hasNonTemplateFiles(dir, depth, relativeDir = '') {
+        if (depth > 4) return false;
+        let entries;
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return false; }
+        for (const entry of entries) {
+          const relativePath = relativeDir ? path.posix.join(relativeDir, entry.name) : entry.name;
+          if (entry.isDirectory()) {
+            if (defaultSkippedDirs.has(entry.name) || ignoredDirs.has(entry.name) || ignoredDirs.has(relativePath)) continue;
+            if (hasNonTemplateFiles(path.join(dir, entry.name), depth + 1, relativePath)) return true;
+            continue;
+          }
+          if (ignoredFiles.has(entry.name) || ignoredFiles.has(relativePath)) continue;
+          return true;
+        }
+        return false;
+      }
+      isTemplateBootstrapOnlyProject = !hasNonTemplateFiles(cwd, 0);
+      if (isTemplateBootstrapOnlyProject) {
+        hasCode = false;
+        hasPackageFile = false;
+      }
+    }
+  } catch { /* intentionally empty — template bootstrap detection is best-effort */ }`;
+
+  if (!source.includes(detectionBlock)) {
+    throw new Error(`Could not patch GSD brownfield detection for ${runtimeName}.`);
+  }
+
+  fs.writeFileSync(initPath, source.replace(detectionBlock, injectedBlock), "utf8");
+
+  return {
+    patched: true,
+    reason: "template bootstrap patch applied",
+    path: initPath
+  };
+}
+
 module.exports = {
+  ensureTemplateBootstrapConfig,
   ensurePlanningConfig,
   getAllRuntimeStatuses,
   getInstallSpec,
   getPlanningStatus,
   getRuntimeStatus,
+  getTemplateBootstrapConfigPath,
   normalizePlanningConfig,
   parseRuntimeSelection,
+  patchGsdInitForTemplateBootstrap,
+  templateBootstrapConfig,
   runtimeDefinitions,
   runtimeNames
 };

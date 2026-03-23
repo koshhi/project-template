@@ -5,11 +5,14 @@ const os = require("node:os");
 const path = require("node:path");
 
 const {
+  ensureTemplateBootstrapConfig,
   ensurePlanningConfig,
   getPlanningStatus,
   getRuntimeStatus,
+  getTemplateBootstrapConfigPath,
   normalizePlanningConfig,
-  parseRuntimeSelection
+  parseRuntimeSelection,
+  patchGsdInitForTemplateBootstrap
 } = require("../scripts/lib/gsd");
 
 function makeTempDir() {
@@ -111,4 +114,45 @@ test("normalizePlanningConfig enforces planning defaults", () => {
   assert.equal(config.planning.commit_docs, true);
   assert.equal(config.planning.search_gitignored, false);
   assert.equal(config.git.branching_strategy, "none");
+});
+
+test("ensureTemplateBootstrapConfig creates the template marker when missing", () => {
+  const rootDir = makeTempDir();
+  const result = ensureTemplateBootstrapConfig(rootDir);
+
+  assert.equal(result.created, true);
+  assert.equal(
+    fs.existsSync(getTemplateBootstrapConfigPath(rootDir)),
+    true
+  );
+});
+
+test("patchGsdInitForTemplateBootstrap injects template bootstrap detection", () => {
+  const rootDir = makeTempDir();
+  const initPath = path.join(
+    rootDir,
+    ".codex",
+    "get-shit-done",
+    "bin",
+    "lib",
+    "init.cjs"
+  );
+
+  fs.mkdirSync(path.dirname(initPath), { recursive: true });
+  fs.writeFileSync(
+    initPath,
+    `hasPackageFile = pathExistsInternal(cwd, 'package.json') ||
+                   pathExistsInternal(cwd, 'requirements.txt') ||
+                   pathExistsInternal(cwd, 'Cargo.toml') ||
+                   pathExistsInternal(cwd, 'go.mod') ||
+                   pathExistsInternal(cwd, 'Package.swift');\n`,
+    "utf8"
+  );
+
+  const result = patchGsdInitForTemplateBootstrap(rootDir, "codex");
+  const patchedSource = fs.readFileSync(initPath, "utf8");
+
+  assert.equal(result.patched, true);
+  assert.match(patchedSource, /template-bootstrap\.json/);
+  assert.match(patchedSource, /hasNonTemplateFiles/);
 });

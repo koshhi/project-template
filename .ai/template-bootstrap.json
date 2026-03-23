@@ -1,0 +1,25 @@
+{
+  "ignore_dirs": [
+    ".ai",
+    ".claude",
+    ".codex",
+    ".github",
+    ".mcp",
+    ".planning",
+    "docs",
+    "scripts",
+    "tests",
+    "node_modules",
+    "dist",
+    "build",
+    "target"
+  ],
+  "ignore_files": [
+    ".DS_Store",
+    ".gitignore",
+    "AGENTS.md",
+    "README.md",
+    "package.json",
+    "pnpm-lock.yaml"
+  ]
+}

@@ -2,10 +2,12 @@ const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
 const {
+  ensureTemplateBootstrapConfig,
   ensurePlanningConfig,
   getInstallSpec,
   getPlanningStatus,
   getRuntimeStatus,
+  patchGsdInitForTemplateBootstrap,
   parseRuntimeSelection,
   runtimeDefinitions
 } = require("./lib/gsd");
@@ -36,9 +38,15 @@ function formatRuntimeStatus(status) {
 function main() {
   const selectedRuntimes = parseRuntimeSelection(process.argv.slice(2));
   const installSpec = getInstallSpec();
+  const templateBootstrap = ensureTemplateBootstrapConfig(rootDir);
+  const patchResults = [];
 
   for (const runtimeName of selectedRuntimes) {
     installRuntime(runtimeName, installSpec);
+    patchResults.push({
+      runtimeName,
+      ...patchGsdInitForTemplateBootstrap(rootDir, runtimeName)
+    });
   }
 
   const planningConfig = ensurePlanningConfig(rootDir, selectedRuntimes);
@@ -53,10 +61,21 @@ function main() {
 
   console.log(`- Planning: ${planningStatus.state}`);
   console.log(
+    templateBootstrap.created
+      ? `- Seeded ${path.relative(rootDir, templateBootstrap.path)}`
+      : `- Reused ${path.relative(rootDir, templateBootstrap.path)}`
+  );
+  console.log(
     planningConfig.created
       ? `- Seeded ${path.relative(rootDir, planningConfig.path)}`
       : `- Reused ${path.relative(rootDir, planningConfig.path)}`
   );
+
+  for (const patchResult of patchResults) {
+    console.log(
+      `- ${runtimeDefinitions[patchResult.runtimeName].label} brownfield patch: ${patchResult.reason}`
+    );
+  }
 }
 
 try {

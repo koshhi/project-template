@@ -74,6 +74,7 @@ pnpm ai:gsd:init
 ```
 
 Por defecto instala GSD para Claude y Codex en el repo actual y si falta crea `.planning/config.json`.
+Tambien aplica un parche local a GSD para que `new-project` ignore la infraestructura del template y no trate un repo recien creado como brownfield solo por incluir los scripts del scaffold.
 
 Opciones utiles:
 

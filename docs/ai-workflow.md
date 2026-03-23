@@ -59,6 +59,8 @@ Este bootstrap:
 - instala GSD localmente para Claude y Codex por defecto
 - acepta `--runtime=claude|codex|both`
 - crea `.planning/config.json` si falta
+- crea `.ai/template-bootstrap.json` para marcar la infraestructura del scaffold
+- parchea localmente la deteccion brownfield de GSD para ignorar el codigo del propio template
 - no toca `.ai/local/`
 
 Comandos base por runtime:
